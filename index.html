@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Pitfall</title>
+	<style>
+		body { background: #333; }
+	</style>
+</head>
+<body>
+<script>
+	// do we need this?
+	(function() {
+	    var lastTime = 0, vendors = ["ms", "moz", "webkit", "o"];
+	    for(var x = 0; x < vendors.length && !window.requestAnimationFrame; ++x) {
+	        window.requestAnimationFrame = window[vendors[x]+"RequestAnimationFrame"];
+	        window.cancelAnimationFrame = window[vendors[x]+"CancelAnimationFrame"]
+	                                   || window[vendors[x]+"CancelRequestAnimationFrame"];
+	    }
+	    if (!window.requestAnimationFrame)
+	        window.requestAnimationFrame = function(callback, element) {
+	            var currTime = new Date().getTime();
+	            var timeToCall = Math.max(0, 16 - (currTime - lastTime));
+	            var id = window.setTimeout(function() { callback(currTime + timeToCall); },
+	              timeToCall);
+	            lastTime = currTime + timeToCall;
+	            return id;
+	        };
+	    if (!window.cancelAnimationFrame)
+	        window.cancelAnimationFrame = function(id) {
+	            clearTimeout(id);
+	        };
+	}());
+</script>
+<script src="pitfall.js"></script>
+<script>
+	var pitfall = new Pitfall({
+		width: 27, // 9, 18, 27, 36
+		height: 13,
+		playerWidth: 1,
+		square: 50,
+		pathWidth: 6,
+		changePathDirFrequency: 10,
+		updateFrequency: 200,
+		levelSpeedIncrement: 200,
+		levelComplexityIncrement: 5, // ? not sure if there"s a smart way to do this
+		colors: {
+			level: [
+				{
+					terrain: "#B64926",
+					edge: "#FFB03B",
+					background: "#8E2800"
+				},
+				{
+					terrain: "#123456",
+					edge: "#654321",
+					background: "#AAAAAA"
+				},
+				{
+					terrain: "#123456",
+					edge: "#654321",
+					background: "#AAAAAA"
+				}
+				// ... up to 10 levels
+			],
+			playerHealth: [
+				"#00261C",
+				"#044C29",
+				"#167F39",
+				"#45BF55",
+				"#96ED89"
+			],
+			levelUp: {
+				terrain: "#123456",
+				edge: "#654321",
+				background: "#AAAAAA"
+			}
+		},
+		sounds: {
+			playerHit: "media/hit.mp3",
+			levelUp: "media/hit.mp3",
+			gameStart: "media/gamestart.mp3"
+		}
+	});
+
+	window.onkeydown = function(event) {
+		event.preventDefault();
+		switch ( event.which ) {
+			case 27: pitfall.restart(); break;
+			case 32: pitfall.pause(); break;
+			case 38: pitfall.move("up"); break;
+			case 40: pitfall.move("down"); break;
+		}
+	};
+</script>
+</body>
+</html>
