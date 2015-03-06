@@ -35,15 +35,28 @@
 <script src="pitfall.js"></script>
 <script>
 	var pitfall = new Pitfall({
-		width: 27, // 9, 18, 27, 36
-		height: 13,
+		height: 27, // 9, 18, 27, 36
+		width: 13,
 		playerWidth: 1,
-		square: 50,
-		pathWidth: 6,
-		changePathDirFrequency: 10,
-		updateFrequency: 200,
-		levelSpeedIncrement: 200,
+
+		square: 35, // I've came up with this for the testing purposes.
+					// My previous idea about scaling via CSS didn't work
+					// because of browser's antialiasing.
+					// Set 1 here to have a pixel per square.
+
+		pathWidth: 6, // self explanatory I think
+
+		changePathDirFrequency: 10,  // script will randomly choose a number
+									 // from the range between this value and zero.
+									 // This number will be a length of the current stretch of the road.
+
+		updateFrequency: 160,        // speed of animation
+		levelTimeIncrement: 10,      // seconds
+		levelUpTime: 1,              // seconds
+		levelSpeedIncrement: 10,     // percent
+
 		levelComplexityIncrement: 5, // ? not sure if there"s a smart way to do this
+
 		colors: {
 			level: [
 				{
@@ -52,28 +65,47 @@
 					background: "#8E2800"
 				},
 				{
-					terrain: "#123456",
-					edge: "#654321",
-					background: "#AAAAAA"
+					terrain: "#00261C",
+					edge: "#044C29",
+					background: "#167F39"
 				},
 				{
-					terrain: "#123456",
-					edge: "#654321",
-					background: "#AAAAAA"
+					terrain: "#6B4E15",
+					edge: "#C47B24",
+					background: "#CCAF6B"
+				},
+				{
+					terrain: "#00215E",
+					edge: "#003CAA",
+					background: "#1967F7"
+				},
+				{
+					terrain: "#B64926",
+					edge: "#FFB03B",
+					background: "#8E2800"
+				},
+				{
+					terrain: "#00261C",
+					edge: "#044C29",
+					background: "#167F39"
+				},
+				{
+					terrain: "#6B4E15",
+					edge: "#C47B24",
+					background: "#CCAF6B"
 				}
-				// ... up to 10 levels
 			],
 			playerHealth: [
-				"#00261C",
-				"#044C29",
-				"#167F39",
-				"#45BF55",
-				"#96ED89"
+				"#1E1E1F",
+				"#424143",
+				"#67666A",
+				"#807F83",
+				"#CBC9CF"
 			],
 			levelUp: {
-				terrain: "#123456",
-				edge: "#654321",
-				background: "#AAAAAA"
+				terrain: "#450003",
+				edge: "#5C0002",
+				background: "#94090D"
 			}
 		},
 		sounds: {
@@ -88,8 +120,8 @@
 		switch ( event.which ) {
 			case 27: pitfall.restart(); break;
 			case 32: pitfall.pause(); break;
-			case 38: pitfall.move("up"); break;
-			case 40: pitfall.move("down"); break;
+			case 37: pitfall.move("left"); break;
+			case 39: pitfall.move("right"); break;
 		}
 	};
 </script>
