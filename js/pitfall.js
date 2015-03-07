@@ -1,29 +1,57 @@
 "use strict";
+/* global Howl */
+/* global console */
 
 function Pitfall(config) {
+
 	if ( !( this instanceof Pitfall ) ) { return new Pitfall(config); }
-	// Because of time lack and for simplicity
-	// I assume that there is always a configuration object
-	// ( so no defaults )
-	// and it is always valid.
+
 	var PF = this,
 		canvas = document.createElement("canvas"),
 		ctx = canvas.getContext("2d"),
 		square = config.square,
 		updateFrequency = config.updateFrequency,
-		levelTimeIncrement = config.levelTimeIncrement *1000,
-		levelUpTime = config.levelUpTime *1000,
+		levelTimeIncrement = config.levelTimeIncrement * 1000,
+		levelUpTime = config.levelUpTime * 1000,
 		gen = new Generator(config),
+		images = new Images(config, launch),
 		level = 0,
 		maxLevel = config.colors.level.length - 1,
 		levelTime = 0,
 		pixels = new Pixels(config),
-		rAF, paused;
+		soundsPaused, rAF, paused, started, victory,
+		sounds = {
+	        title: new Howl({
+	        	urls: [config.sounds.title],
+	        	onload: function () {
+	        		images.load();
+	        	}
+	    	}),
+	        game: new Howl({
+	        	urls: [config.sounds.game],
+	        	onpause: function () {
+	        		soundsPaused = true;
+	        	},
+	        	onplay: function () {
+	        		soundsPaused = false;
+	        	}
+	        }),
+	        level: new Howl({ urls: [config.sounds.level] }),
+	        lose: new Howl({ urls: [config.sounds.lose] }),
+	        win: new Howl({ urls: [config.sounds.win] }),
+	        bump: new Howl({ urls: [config.sounds.bump] })
+	    };
+
 
 	canvas.width = config.width * square;
 	canvas.height = config.height * square;
-	init();
 	document.body.appendChild(canvas);
+
+	function launch() {
+		init();
+		images.show("title");
+		sounds.title.play();
+	}
 
 	function init() {
 		paused = true;
@@ -34,9 +62,56 @@ function Pitfall(config) {
 		pixels.draw();
 	}
 
+	function Images(o, onLoadCallback) {
+		var self = this,
+			images = {};
+
+		self.show = function (name) {
+			var img = images[name];
+			ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+		};
+
+		self.slideShow = function (arr, callback) {
+			var name = arr.shift();
+			self.show(name);
+			if ( arr.length ) {
+				setTimeout(function () {
+					self.slideShow(arr, callback);
+				}, o.startImageDelay * 1000);
+			}else {
+				setTimeout(callback, o.startImageDelay * 1000);
+			}
+		};
+
+		self.load = function (a) {
+			var arr = a || [], item;
+			if ( !arr.length ) {
+				for ( item in o.images ) {
+					if ( o.images.hasOwnProperty(item) ) {
+						arr.push([item, o.images[item]]);
+					}
+				}
+			}
+		    var image = new Image(),
+		        imageset = arr.shift(),
+		        name = imageset[0],
+		        url = imageset[1];
+		    image.onload = function() {
+		        images[name] = image;
+		        if ( arr.length ) {
+		        	self.load(arr);
+		        }else {
+		            onLoadCallback();
+		        }
+		    };
+		    image.src = url;
+		};
+	}
+
 	function Generator(o) {
 		var self = this,
-			frq = o.changePathDirFrequency,
+			maxRun = o.maxRun,
+			maxRunIncrement = o.maxRunIncrement,
 			width = o.width,
 			pw = o.pathWidth,
 			M = Math,
@@ -51,34 +126,35 @@ function Pitfall(config) {
 			self.initMark = self.mark;
 			self.initMap = generateMap(o.height);
 		};
-		self.tick = function () {
-			run--;
-			// console.log(run);
-			// console.log(trend);
-			self.mark += trend;
-			if ( self.mark < 0 ) {
-				self.mark = 0;
-				trend = randBinary(0.1); // slightly biased towards bouncing
-				// trend = randFromArray([0, 1]);
-				run = randPiece(width);
-			}else if ( self.mark > width - pw - 1 ) {
-				self.mark = width - pw - 1;
-				trend = randBinary(0.1) * -1; // slightly biased towards bouncing
-				// trend = randFromArray([0, -1]);
-				run = randPiece(width);
-			}else if ( !run ) {
-				trend = randFromArray([0, 1, -1]);
-				run = randPiece(width);
-			}
+		self.increaseMaxRun = function () {
+			maxRun += maxRunIncrement;
+			if ( maxRun > width ) { maxRun = width; }
 		};
-		function randPiece(a) { return M.round(M.random() * a); }
-		function randBinary(bias) { return M.round(M.random() + bias); }
+		self.tick = function () {
+			self.mark += trend;
+			if ( run ) {
+				if ( self.mark < 0 ) {
+					self.mark = 0;
+					trend = randFromArray([0, 1]);
+					run = randPiece(maxRun);
+				}else if ( self.mark > width - pw - 1 ) {
+					self.mark = width - pw - 1;
+					trend = randFromArray([0, -1]);
+					run = randPiece(maxRun);
+				}
+			}else {
+				trend = randFromArray([0, 1, -1]);
+				run = randPiece(maxRun);
+			}
+			run--;
+		};
+		function randPiece(a) { return M.ceil(M.random() * a); }
+		// function randBinary(bias) { return M.round(M.random() + bias); }
 		function randFromArray(arr) { return arr[M.floor(M.random() * arr.length)]; }
 		function generateMap(n) {
 			var arr = [], i = 0;
 			for ( ; i < n; i++ ) {
 				arr.push(self.mark);
-				self.tick();
 			}
 			return arr;
 		}
@@ -154,13 +230,13 @@ function Pitfall(config) {
 			ctx.fillRect(p.x, p.y, square, square);
 		}
 
-		function updateHarry(clsn, mrk) {
-			var posX;
+		function updateHarry(clsn) {
+			var bump;
 			if ( clsn ) {
 				harry.health++;
-				posX = mrk + Math.floor(pw/2);
-				harry.column = posX;
-				harry.x = posX * square;
+				bump = (pixels[harry.row][clsn + 1].color === levelColors.terrain) ? -1 * Math.floor(pw/2) : Math.floor(pw/2);
+				harry.column += bump;
+				harry.x = harry.column * square;
 				if ( harry.colors[harry.health] ) {
 					harry.color = harry.colors[harry.health];
 				}else {
@@ -209,18 +285,22 @@ function Pitfall(config) {
 					pixels[i][j].y -= square;
 					if ( pixels[i][j].x === harry.x ) {
 						if ( pixels[i][j].color === levelColors.edge ) {
-							if ( pixels[i][j].y === harry.y ) { collision = true; }
+							if ( pixels[i][j].y === harry.y ) {
+								collision = j;
+								sounds.bump.play();
+							}
 						}
 					}
 				}
 			}
-			self.gameover = updateHarry(collision, mark);
+			self.gameover = updateHarry(collision);
 			pixels.push(row);
 		};
 
 		self.init = function(map, mark) {
 			levelColors = colors.level[0];
 			pixels = initPixels(o, map);
+			pixels = setColors(pixels, levelColors);
 			harry = initHarry(o, mark);
 		};
 
@@ -236,20 +316,37 @@ function Pitfall(config) {
 
 	PF.restart = function() {
 		if ( rAF ) { cancelAnimation(); }
-		init();
+		started = false;
+		launch();
+	};
+
+	PF.start = function() {
+		if ( !started ) {
+			started = true;
+			sounds.title.stop();
+			sounds.game.play();
+			images.slideShow(["start1", "start2", "start3"], PF.pause);
+		}
 	};
 
 	PF.pause = function() {
-		paused = !paused;
-		if ( paused ) {
-			cancelAnimation();
-		}else {
-			rAF = requestAnimationFrame(loop);
+		if ( started ) {
+			paused = !paused;
+			if ( paused ) {
+				loop.lastTime = 0;
+				sounds.game.pause();
+				cancelAnimation();
+			}else {
+				if ( soundsPaused ) {
+					sounds.game.play();
+				}
+				rAF = requestAnimationFrame(loop);
+			}
 		}
 	};
 
 	PF.move = function(ud) {
-		pixels.moveHarry(ud);
+		if ( !paused ) { pixels.moveHarry(ud); }
 	};
 
 	function cancelAnimation() {
@@ -261,12 +358,12 @@ function Pitfall(config) {
 		levelTime = 0;
 		if ( maxLevel !== level ) {
 			level++;
+			sounds.level.play();
 			pixels.nextLevel(level);
+			gen.increaseMaxRun();
 			updateFrequency -= updateFrequency * (config.levelSpeedIncrement/100);
-			console.log(updateFrequency);
 		}else {
-			// win the game
-			cancelAnimation();
+			victory = true;
 		}
 
 	}
@@ -295,9 +392,19 @@ function Pitfall(config) {
     function update() {
         gen.tick();
         pixels.update(gen.mark);
-        if ( pixels.gameover ) {
-        	pixels.draw();
-        	cancelAnimation();
+        if ( victory || pixels.gameover ) {
+        	if ( victory ) {
+	        	images.show("win");
+	        	sounds.game.stop();
+	        	sounds.win.play();
+        	}else {
+	        	images.show("lose");
+	        	sounds.game.stop();
+	        	sounds.lose.play();
+        	}
+			cancelAnimation();
+			started = false;
+			setTimeout(launch, config.endImageDelay * 1000);
         }else {
         	pixels.draw();
         }

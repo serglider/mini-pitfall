@@ -13,7 +13,7 @@ gulp.task("reload", function () {
 });
 
 gulp.task("watch", function () {
-    gulp.watch(["pitfall.js","index.html"], ["reload"]);
+    gulp.watch(["js/pitfall.js","index.html"], ["reload"]);
 });
 
 gulp.task("default", ["connect", "watch"]);

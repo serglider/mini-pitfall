@@ -5,10 +5,13 @@
 	<title>Pitfall</title>
 	<style>
 		body { background: #333; }
+/*		canvas {
+			zoom: 20;
+		}*/
 	</style>
 </head>
 <body>
-<script>
+<!-- <script>
 	// do we need this?
 	(function() {
 	    var lastTime = 0, vendors = ["ms", "moz", "webkit", "o"];
@@ -31,8 +34,9 @@
 	            clearTimeout(id);
 	        };
 	}());
-</script>
-<script src="pitfall.js"></script>
+</script> -->
+<script src="js/howler.js"></script>
+<script src="js/pitfall.js"></script>
 <script>
 	var pitfall = new Pitfall({
 		height: 27, // 9, 18, 27, 36
@@ -46,16 +50,19 @@
 
 		pathWidth: 6, // self explanatory I think
 
-		changePathDirFrequency: 10,  // script will randomly choose a number
-									 // from the range between this value and zero.
-									 // This number will be a length of the current stretch of the road.
+		maxRun: 13,  // script will randomly choose a number
+				 	// from the range between this value and zero.
+				 	// This number will be a length of the current stretch of the road.
 
-		updateFrequency: 160,        // speed of animation
+		maxRunIncrement: -1, // for each level the maxRun property will be incremented by this value
+
+		updateFrequency: 160,        // speed of animation, ms
 		levelTimeIncrement: 10,      // seconds
 		levelUpTime: 1,              // seconds
 		levelSpeedIncrement: 10,     // percent
 
-		levelComplexityIncrement: 5, // ? not sure if there"s a smart way to do this
+		startImageDelay: 1,     // seconds
+		endImageDelay: 5,     // seconds
 
 		colors: {
 			level: [
@@ -102,16 +109,32 @@
 				"#807F83",
 				"#CBC9CF"
 			],
+			bump: {
+				terrain: "#450003",
+				edge: "#5C0002",
+				background: "#94090D"
+			},
 			levelUp: {
 				terrain: "#450003",
 				edge: "#5C0002",
 				background: "#94090D"
 			}
 		},
+		images: {
+			title: "media/title.png",
+			start1: "media/start1.png",
+			start2: "media/start2.png",
+			start3: "media/start3.png",
+			lose: "media/lose.png",
+			win: "media/win.png"
+		},
 		sounds: {
-			playerHit: "media/hit.mp3",
-			levelUp: "media/hit.mp3",
-			gameStart: "media/gamestart.mp3"
+			title: "media/title-loop.mp3",
+			game: "media/in-game.mp3",
+			level: "media/level-up.mp3",
+			lose: "media/lose.mp3",
+			win: "media/win.mp3",
+			bump: "media/incorrect.m4a"
 		}
 	});
 
@@ -119,7 +142,8 @@
 		event.preventDefault();
 		switch ( event.which ) {
 			case 27: pitfall.restart(); break;
-			case 32: pitfall.pause(); break;
+			case 32: pitfall.start(); break;
+			case 80: pitfall.pause(); break;
 			case 37: pitfall.move("left"); break;
 			case 39: pitfall.move("right"); break;
 		}
