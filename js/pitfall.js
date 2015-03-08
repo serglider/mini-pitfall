@@ -23,6 +23,7 @@ function Pitfall(config) {
 		sounds = {
 	        title: new Howl({
 	        	urls: [config.sounds.title],
+	        	loop: true,
 	        	onload: function () {
 	        		images.load();
 	        	}
@@ -34,6 +35,10 @@ function Pitfall(config) {
 	        	},
 	        	onplay: function () {
 	        		soundsPaused = false;
+	        	},
+	        	onend: function () {
+	        		sounds.game.sprite({ loop: [3700, 46080] });
+	        		sounds.game.play("loop");
 	        	}
 	        }),
 	        level: new Howl({ urls: [config.sounds.level] }),
@@ -165,6 +170,8 @@ function Pitfall(config) {
 			colors = o.colors,
 			levelColors = colors.level[0],
 			levelUpColors = colors.levelUp,
+			bumpColors = colors.bump,
+			flashTime = o.bumpFlashTime * 1000,
 			pw = o.pathWidth,
 			harry = null,
 			pixels = null;
@@ -183,11 +190,12 @@ function Pitfall(config) {
 
 		function initHarry(o, imark) {
 			var posX = imark + Math.floor(pw/2),
+				posY = Math.floor(o.height/3),
 				obj = {
 					column: posX,
-					row: 0,
+					row: posY,
 					x: posX * square,
-					y: 0,
+					y: posY * square,
 					health: 0,
 					colors: o.colors.playerHealth,
 					color: o.colors.playerHealth[0]
@@ -239,6 +247,10 @@ function Pitfall(config) {
 				harry.x = harry.column * square;
 				if ( harry.colors[harry.health] ) {
 					harry.color = harry.colors[harry.health];
+					pixels = setColors(pixels, bumpColors);
+					setTimeout(function () {
+						pixels = setColors(pixels, levelColors);
+					}, flashTime);
 				}else {
 					harry.color = "#FF1D23";
 					return true;
@@ -293,14 +305,17 @@ function Pitfall(config) {
 					}
 				}
 			}
-			self.gameover = updateHarry(collision);
 			pixels.push(row);
+			self.gameover = updateHarry(collision);
 		};
 
 		self.init = function(map, mark) {
 			levelColors = colors.level[0];
 			pixels = initPixels(o, map);
 			pixels = setColors(pixels, levelColors);
+			console.log(levelColors);
+			console.log(pixels);
+			debugger;
 			harry = initHarry(o, mark);
 		};
 
@@ -404,7 +419,10 @@ function Pitfall(config) {
         	}
 			cancelAnimation();
 			started = false;
-			setTimeout(launch, config.endImageDelay * 1000);
+			setTimeout(function () {
+				// launch();
+				document.location.reload();
+			}, config.endImageDelay * 1000);
         }else {
         	pixels.draw();
         }
