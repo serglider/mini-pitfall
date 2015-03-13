@@ -1,0 +1,21 @@
+{
+  "name": "pitfall",
+  "version": "0.0.0",
+  "authors": [
+    "Mic Black",
+    "Sergey Chernykh"
+  ],
+  "license": "MIT",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "leapjs": "~0.6.2",
+    "leapjs-plugins": "~0.1.6"
+  }
+}

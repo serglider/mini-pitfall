@@ -10,16 +10,15 @@ function Pitfall(config) {
 		canvas = document.createElement("canvas"),
 		ctx = canvas.getContext("2d"),
 		square = config.square,
-		updateFrequency = config.updateFrequency,
 		levelTimeIncrement = config.levelTimeIncrement * 1000,
-		levelUpTime = config.levelUpTime * 1000,
+		tickToSendData = config.tickToSendData,
 		gen = new Generator(config),
 		images = new Images(config, launch),
-		level = 0,
 		maxLevel = config.colors.level.length - 1,
-		levelTime = 0,
 		pixels = new Pixels(config),
-		soundsPaused, rAF, paused, started, victory,
+		soundsPaused, rAF, paused, started, victory, resetDelay,
+		updateFrequency, level, levelTime, moveDirection,
+		animationTick, imageData,
 		sounds = {
 	        title: new Howl({
 	        	urls: [config.sounds.title],
@@ -47,9 +46,10 @@ function Pitfall(config) {
 	        bump: new Howl({ urls: [config.sounds.bump] })
 	    };
 
-
+	ctx.imageSmoothingEnabled = false;
 	canvas.width = config.width * square;
 	canvas.height = config.height * square;
+	canvas.id = "game";
 	document.body.appendChild(canvas);
 
 	function launch() {
@@ -62,6 +62,9 @@ function Pitfall(config) {
 		paused = true;
 		level = 0;
 		levelTime = 0;
+		loop.lastTime = 0;
+		animationTick = 0;
+		updateFrequency = config.updateFrequency;
 		gen.init();
 		pixels.init(gen.initMap, gen.initMark);
 		pixels.draw();
@@ -115,16 +118,16 @@ function Pitfall(config) {
 
 	function Generator(o) {
 		var self = this,
-			maxRun = o.maxRun,
 			maxRunIncrement = o.maxRunIncrement,
 			width = o.width,
 			pw = o.pathWidth,
 			M = Math,
-			run, trend;
+			run, trend, maxRun;
 		self.mark = null;
 		self.initMap = null;
 		self.initMark = null;
 		self.init = function () {
+			maxRun = o.maxRun;
 			run = randPiece(width);
 			trend = randFromArray([0, 1, -1]);
 			self.mark = M.round(width/2) - M.ceil(o.pathWidth/2);
@@ -154,7 +157,6 @@ function Pitfall(config) {
 			run--;
 		};
 		function randPiece(a) { return M.ceil(M.random() * a); }
-		// function randBinary(bias) { return M.round(M.random() + bias); }
 		function randFromArray(arr) { return arr[M.floor(M.random() * arr.length)]; }
 		function generateMap(n) {
 			var arr = [], i = 0;
@@ -169,10 +171,11 @@ function Pitfall(config) {
 		var self = this,
 			colors = o.colors,
 			levelColors = colors.level[0],
-			levelUpColors = colors.levelUp,
+			levelUpColor = colors.levelUp,
 			bumpColors = colors.bump,
 			flashTime = o.bumpFlashTime * 1000,
 			pw = o.pathWidth,
+			levelUp, levelUpColors, bumped,
 			harry = null,
 			pixels = null;
 
@@ -190,7 +193,7 @@ function Pitfall(config) {
 
 		function initHarry(o, imark) {
 			var posX = imark + Math.floor(pw/2),
-				posY = Math.floor(o.height/3),
+				posY = Math.floor(o.height/5),
 				obj = {
 					column: posX,
 					row: posY,
@@ -203,7 +206,7 @@ function Pitfall(config) {
 			return obj;
 		}
 
-		function getRow(index, mark) {
+		function getRow(index, mark, levelup) {
 			var arr = [],
 				i = 0,
 				pixel;
@@ -215,18 +218,26 @@ function Pitfall(config) {
 				if ( i < mark  ) {
 					pixel.type = "terrain";
 					pixel.color = levelColors.terrain;
+					pixel.bumpColor = bumpColors.terrain;
 				}else if ( i === mark ) {
 					pixel.type = "edge";
 					pixel.color = levelColors.edge;
+					pixel.bumpColor = bumpColors.edge;
 				}else if ( i < mark + pw ) {
 					pixel.type = "background";
 					pixel.color = levelColors.background;
+					pixel.bumpColor = bumpColors.background;
 				}else if ( i === mark + pw ) {
 					pixel.type = "edge";
 					pixel.color = levelColors.edge;
+					pixel.bumpColor = bumpColors.edge;
 				}else {
 					pixel.type = "terrain";
 					pixel.color = levelColors.terrain;
+					pixel.bumpColor = bumpColors.terrain;
+				}
+				if ( levelup ) {
+					pixel.levelUpColor = levelUpColors[levelup];
 				}
 				arr.push(pixel);
 			}
@@ -236,20 +247,61 @@ function Pitfall(config) {
 		function drawPixel(p) {
 			ctx.fillStyle = p.color;
 			ctx.fillRect(p.x, p.y, square, square);
+			if ( p.levelUpColor ) {
+				ctx.fillStyle = p.levelUpColor;
+				ctx.fillRect(p.x, p.y, square, square);
+			}
 		}
 
-		function updateHarry(clsn) {
+		function drawPixelBumped(p) {
+			ctx.fillStyle = p.bumpColor;
+			ctx.fillRect(p.x, p.y, square, square);
+		}
+
+		self.gameover = false;
+
+		self.draw = function() {
+			var i = 0, j = 0;
+			if ( bumped ) {
+				for ( ; i < o.height; i++ ) {
+					for ( j = 0; j < o.width; j++ ) {
+						drawPixelBumped(pixels[i][j]);
+					}
+				}
+			}else {
+				for ( ; i < o.height; i++ ) {
+					for ( j = 0; j < o.width; j++ ) {
+						drawPixel(pixels[i][j]);
+					}
+				}
+			}
+			drawPixel(harry);
+		};
+
+		function moveHarry(dir) {
+			if ( pixels[harry.row][harry.column].color === levelColors.edge ) { return; }
+			var add = ( +dir ) ? dir : ( dir === "left" ) ? -1 : 1;
+			harry.column += add;
+			if ( harry.column > o.width - 2 ) {
+				harry.column = o.width - 2;
+			}else if ( harry.column < 1 ) {
+				harry.column = 1;
+			}
+			harry.x = harry.column * square;
+		}
+
+		function updateHarry() {
 			var bump;
-			if ( clsn ) {
+			if ( pixels[harry.row][harry.column].color === levelColors.edge ) {
 				harry.health++;
-				bump = (pixels[harry.row][clsn + 1].color === levelColors.terrain) ? -1 * Math.floor(pw/2) : Math.floor(pw/2);
+				bump = (pixels[harry.row][harry.column + 1].color === levelColors.terrain) ? -1 * Math.floor(pw/2) : Math.floor(pw/2);
 				harry.column += bump;
 				harry.x = harry.column * square;
 				if ( harry.colors[harry.health] ) {
 					harry.color = harry.colors[harry.health];
-					pixels = setColors(pixels, bumpColors);
+					bumped = true;
 					setTimeout(function () {
-						pixels = setColors(pixels, levelColors);
+						bumped = false;
 					}, flashTime);
 				}else {
 					harry.color = "#FF1D23";
@@ -258,23 +310,8 @@ function Pitfall(config) {
 			}
 		}
 
-		self.gameover = false;
-
-		self.draw = function() {
-			var i = 0, j = 0;
-			for ( ; i < o.height; i++ ) {
-				for ( j = 0; j < o.width; j++ ) {
-					drawPixel(pixels[i][j]);
-				}
-			}
-			drawPixel(harry);
-		};
-
-		self.moveHarry = function(dir) {
-			var add = ( dir === "left" ) ? -1 : 1;
-			harry.column += add;
-			if ( harry.column > o.width - 2 ) { harry.column = o.width - 2; }
-			if ( harry.column < 1 ) { harry.column = 1; }
+		self.moveHarryX = function(xCol) {
+			harry.column = xCol;
 			harry.x = harry.column * square;
 		};
 
@@ -288,40 +325,48 @@ function Pitfall(config) {
 			return arr;
 		}
 
-		self.update = function(mark) {
-			var row = getRow(o.height - 1, mark),
-				i = 0, j, collision;
+		function setLevelUpColors(n, colorarr) {
+			var arr = [],
+				colorstr = colorarr.join(","),
+				delta = 1/n,
+				i = 0,
+				opacity, color;
+			for ( ; i < n; i++ ) {
+				opacity = 1 - delta * i;
+				color = "rgba("+ colorstr + "," + opacity + ")";
+				arr.push(color);
+			}
+			return arr;
+		}
+
+		self.update = function(mark, movedir) {
+			var row = getRow(o.height - 1, mark, levelUp),
+				i = 0, j;
 			pixels.shift();
+			if ( movedir && !bumped ) { moveHarry(movedir); }
+			self.gameover = updateHarry();
 			for ( ; i < o.height - 1; i++ ) {
 				for ( j = 0; j < o.width; j++ ) {
 					pixels[i][j].y -= square;
-					if ( pixels[i][j].x === harry.x ) {
-						if ( pixels[i][j].color === levelColors.edge ) {
-							if ( pixels[i][j].y === harry.y ) {
-								collision = j;
-								sounds.bump.play();
-							}
-						}
-					}
 				}
 			}
 			pixels.push(row);
-			self.gameover = updateHarry(collision);
+			if ( levelUp ) {
+				levelUp--;
+				if ( levelUp === 1 ) { levelColors = colors.level[level]; }
+			}
 		};
 
 		self.init = function(map, mark) {
+			levelUpColors = setLevelUpColors(o.levelUpRows, levelUpColor);
 			levelColors = colors.level[0];
 			pixels = initPixels(o, map);
 			pixels = setColors(pixels, levelColors);
-			console.log(levelColors);
-			console.log(pixels);
-			debugger;
 			harry = initHarry(o, mark);
 		};
 
-		self.nextLevel = function(level) {
-			levelColors = colors.level[level];
-			pixels = setColors(pixels, levelUpColors);
+		self.nextLevel = function() {
+			levelUp = o.levelUpRows;
 		};
 
 		self.setLevelColors = function() {
@@ -361,7 +406,13 @@ function Pitfall(config) {
 	};
 
 	PF.move = function(ud) {
-		if ( !paused ) { pixels.moveHarry(ud); }
+		if ( !paused && !moveDirection ) {
+			moveDirection = ud;
+		}
+	};
+
+	PF.moveABS = function(x) {
+		if ( !paused ) { pixels.moveHarryX(x); }
 	};
 
 	function cancelAnimation() {
@@ -388,11 +439,7 @@ function Pitfall(config) {
     	var dT = time - loop.lastTime;
     	if ( dT > updateFrequency ) {
     		levelTime += dT;
-    		if ( levelTime > levelTimeIncrement ) {
-    			increaseLevel();
-    		}else if ( levelTime > levelUpTime ) {
-    			pixels.setLevelColors();
-    		}
+    		if ( levelTime > levelTimeIncrement ) { increaseLevel(); }
     		loop.lastTime = time;
 	        clear();
 	        update();
@@ -406,29 +453,51 @@ function Pitfall(config) {
 
     function update() {
         gen.tick();
-        pixels.update(gen.mark);
+        pixels.update(gen.mark, moveDirection);
+        if ( moveDirection ) { moveDirection = false; }
         if ( victory || pixels.gameover ) {
         	if ( victory ) {
 	        	images.show("win");
 	        	sounds.game.stop();
 	        	sounds.win.play();
+	        	resetDelay = config.endImageDelay.success * 1000;
         	}else {
 	        	images.show("lose");
 	        	sounds.game.stop();
 	        	sounds.lose.play();
+	        	resetDelay = config.endImageDelay.fail * 1000;
         	}
 			cancelAnimation();
 			started = false;
-			setTimeout(function () {
-				// launch();
-				document.location.reload();
-			}, config.endImageDelay * 1000);
+			setTimeout(launch, resetDelay);
         }else {
         	pixels.draw();
+        	animationTick++;
+        	if ( animationTick === tickToSendData ) {
+        		imageData = getData();
+        		fireEvent(imageData);
+        		animationTick = 0;
+        	}
         }
     }
 
     function queue() {
         if ( rAF ) { rAF = requestAnimationFrame(loop); }
     }
+
+	function getData() {
+		var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data,
+			len = imageData.length,
+			data = [],
+			i = 0;
+		for ( ; i < len; i++ ) {
+			data.push(imageData[i], imageData[i + 1], imageData[i + 2]);
+		}
+		return data;
+	}
+
+    function fireEvent(data) {
+		var ev = new CustomEvent("pitfall.imageData", { detail: data });
+		document.dispatchEvent(ev);
+	}
 }

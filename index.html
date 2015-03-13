@@ -5,115 +5,126 @@
 	<title>Pitfall</title>
 	<style>
 		body { background: #333; }
-/*		canvas {
+		canvas {
 			zoom: 20;
-		}*/
+			image-rendering: mizeSpeed;
+			image-rendering: pixelated;
+		}
 	</style>
 </head>
 <body>
+
 <script src="js/howler.js"></script>
 <script src="js/pitfall.js"></script>
+<script src="js/socket.io.js"></script>
+<script src="bower_components/leapjs/leap-0.6.2.js"></script>
+<script src="bower_components/leapjs-plugins/main/screen-position/leap.screen-position.js"></script>
+<script src="bower_components/leapjs-plugins/main/hand-entry/leap.hand-entry.js"></script>
+
 <script>
+
+	var cols = 18,
+		rows = 13;
+
 	var pitfall = new Pitfall({
-		height: 27, // 9, 18, 27, 36
-		width: 13,
-		playerWidth: 1,
 
-		square: 35, // I've came up with this for the testing purposes.
-					// My previous idea about scaling via CSS didn't work
-					// because of browser's antialiasing.
-					// Set 1 here to have a pixel per square.
+			height: rows,
+			width: cols,
 
-		pathWidth: 6, // self explanatory I think
+			playerWidth: 1,
 
-		maxRun: 13,  // script will randomly choose a number
-				 	// from the range between this value and zero.
-				 	// This number will be a length of the current stretch of the road.
+			square: 1, 					// I've came up with this for the testing purposes.
+										// My previous idea about scaling via CSS didn't work
+										// because of browser's antialiasing.
+										// Set 1 here to have a pixel per square.
 
-		maxRunIncrement: -1, // for each level the maxRun property will be incremented by this value
+			pathWidth: 9, 				// self explanatory I think
 
-		updateFrequency: 160,        // speed of animation, ms
-		levelTimeIncrement: 10,      // seconds
-		levelUpTime: 1,              // seconds
-		levelSpeedIncrement: 10,     // percent
+			maxRun: 2,  				// script will randomly choose a number
+									 	// from the range between this value and zero.
+									 	// This number will be a length of the current stretch of the road.
 
-		startImageDelay: 1,     // seconds
-		endImageDelay: 5,     // seconds
+			maxRunIncrement: 3, 		// for each level the maxRun property will be incremented by this value
 
-		bumpFlashTime: 0.5,     // seconds
+			updateFrequency: 100,       // speed of animation, ms
+			levelTimeIncrement: 10,     // seconds
 
-		colors: {
-			level: [
-				{
-					terrain: "#B64926",
-					edge: "#FFB03B",
-					background: "#8E2800"
-				},
-				{
-					terrain: "#00261C",
-					edge: "#044C29",
-					background: "#167F39"
-				},
-				{
-					terrain: "#6B4E15",
-					edge: "#C47B24",
-					background: "#CCAF6B"
-				},
-				{
-					terrain: "#00215E",
-					edge: "#003CAA",
-					background: "#1967F7"
-				},
-				{
-					terrain: "#B64926",
-					edge: "#FFB03B",
-					background: "#8E2800"
-				},
-				{
-					terrain: "#00261C",
-					edge: "#044C29",
-					background: "#167F39"
-				},
-				{
-					terrain: "#6B4E15",
-					edge: "#C47B24",
-					background: "#CCAF6B"
-				}
-			],
-			playerHealth: [
-				"#1E1E1F",
-				"#424143",
-				"#67666A",
-				"#807F83",
-				"#CBC9CF"
-			],
-			bump: {
-				terrain: "#450003",
-				edge: "#5C0002",
-				background: "#94090D"
+			// new
+			levelUpRows: 8, // number of rows to fade levelUp color
+
+			levelSpeedIncrement: 20,    // percent
+
+			startImageDelay: 1,     	// seconds
+			endImageDelay: {
+				success: 25,     		// won the game
+				fail: 5 				// lost the game
 			},
-			levelUp: {
-				terrain: "#450003",
-				edge: "#5C0002",
-				background: "#94090D"
+
+			bumpFlashTime: 0.3,     		// seconds
+
+
+			// new
+			tickToSendData: 4, // each fourth (in this case) animation tick will fire an event which contains the image data in its event.detail. See below event listener for the "pitfall.imageData" event.
+
+			colors: {
+				level: [
+					{
+						terrain: "#920e3c",
+						edge: "#c11350",
+						background: "#000000"
+					},
+					{
+						terrain: "#017aa3",
+						edge: "#51c9fd",
+						background: "#000000"
+					},
+					{
+						terrain: "#007561",
+						edge: "#00fbcf",
+						background: "#000000"
+					},
+					{
+						terrain: "#fe9601",
+						edge: "#ffad33",
+						background: "#000000"
+					},
+					{
+						terrain: "#000000",
+						edge: "#333333",
+						background: "#666666"
+					}
+				],
+				playerHealth: [
+					"#ffffff",
+					"#cccccc",
+					"#aaaaaa",
+					"#ff0000",
+					"#ff0000"
+				],
+				bump: {
+					terrain: "#450003",
+					edge: "#5C0002",
+					background: "#ff0000"
+				},
+
+				levelUp: [255, 255, 0] // rgb value to set fade effect using rgba >>> ctx.fillStyle = "rgba(255,255,0,0.5)"
+			},
+			images: {
+				title: "media/title.png",
+				start1: "media/start1.png",
+				start2: "media/start2.png",
+				start3: "media/start3.png",
+				lose: "media/lose.png",
+				win: "media/win.png"
+			},
+			sounds: {
+				title: "media/title-loop.mp3",
+				game: "media/in-game.mp3",
+				level: "media/level-up.mp3",
+				lose: "media/lose.mp3",
+				win: "media/win.mp3",
+				bump: "media/incorrect.m4a"
 			}
-		},
-		images: {
-			title: "media/title.png",
-			start1: "media/start1.png",
-			start2: "media/start2.png",
-			start3: "media/start3.png",
-			lose: "media/lose.png",
-			win: "media/win.png"
-		},
-		sounds: {
-			title: "media/title-loop.mp3",
-			game: "media/in-game.mp3",
-			level: "media/level-up.mp3",
-			lose: "media/lose.mp3",
-			win: "media/win.mp3",
-			bump: "media/incorrect.m4a"
-		}
 	});
 
 	window.onkeydown = function(event) {
@@ -126,6 +137,73 @@
 			case 39: pitfall.move("right"); break;
 		}
 	};
-</script>
+
+	window.onmousemove = onMouseMove;
+
+	function onMouseMove(e) {
+		onMouseMove.x = onMouseMove.x || e.pageX;
+		if ( Math.abs(onMouseMove.x - e.pageX) > 20 ) {
+			if ( onMouseMove.x > e.pageX ) {
+				pitfall.move("left");
+			}else if ( onMouseMove.x < e.pageX ) {
+				pitfall.move("right");
+			}
+			onMouseMove.x = e.pageX;
+		}
+	}
+
+	// 	var socket = io.connect("http://localhost:8181");
+	// 	socket.emit("init", { brightness: 100 });
+
+	document.addEventListener("pitfall.imageData",function(event) {
+		console.log(event.detail);
+		// socket.emit("data", event.detail);
+	}, false);
+
+// Leap
+// 		var prevX = cols / 2;
+
+// 		Leap.loop(function(frame) {
+// 			var hands = frame.hands;
+
+// 			if (hands.length == 0 || hands.length == 2) {
+// 				return;
+// 			}
+
+// 			hands.forEach(function(hand, index) {
+// 			    var x = hand.palmPosition[0];
+
+// 			    /*if (x < 0 && x < (xMax * -1 + reduceRangeBy)) {
+// 			    	x = xMax + reduceRangeBy;
+// 			    }
+
+// 			    if (x > 0 && x > (xMax - reduceRangeBy)) {
+// 			    	x = xMax - reduceRangeBy;
+// 			    }*/
+
+// 			    x = cols / 2 + Math.ceil(x / cols);
+
+// 			    x = (x < 1) ? 1 : (x > cols) ? cols : x;
+
+// 			    if (prevX == x) {
+// 			    	return;
+// 			    }
+
+// 			    pitfall.moveABS(x);
+// 			    prevX = x;
+
+// 			    console.log(x);
+// 			});
+
+// 		})
+// 		/*
+// 		.use('screenPosition')
+// 		.use('handEntry')
+// 		.on('handFound', function (hand) {
+// 			console.log(hand);
+// 			debugger;
+// 		});
+// */
+	</script>
 </body>
 </html>
