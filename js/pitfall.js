@@ -293,6 +293,7 @@ function Pitfall(config) {
 		function updateHarry() {
 			var bump;
 			if ( pixels[harry.row][harry.column].color === levelColors.edge ) {
+				sounds.bump.play();
 				harry.health++;
 				bump = (pixels[harry.row][harry.column + 1].color === levelColors.terrain) ? -1 * Math.floor(pw/2) : Math.floor(pw/2);
 				harry.column += bump;
