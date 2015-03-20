@@ -50,6 +50,9 @@
 			levelTimeIncrement: 10,     // seconds
 
 			// new
+			bumpBackX: 1,     // columns
+
+			// new
 			levelUpRows: 8, // number of rows to fade levelUp color
 
 			levelSpeedIncrement: 20,    // percent
@@ -61,10 +64,6 @@
 			},
 
 			bumpFlashTime: 0.3,     		// seconds
-
-
-			// new
-			tickToSendData: 4, // each fourth (in this case) animation tick will fire an event which contains the image data in its event.detail. See below event listener for the "pitfall.imageData" event.
 
 			colors: {
 				level: [
@@ -127,6 +126,17 @@
 			}
 	});
 
+	var dataBroker = new ImageDataBroker();
+
+	dataBroker.init({
+		dataProvider: pitfall.getData,
+		// set here whatever fps you want and the function above will bring you image data with needed frequency
+		fps: 30
+	});
+
+	dataBroker.run();
+
+
 	window.onkeydown = function(event) {
 		event.preventDefault();
 		switch ( event.which ) {
@@ -138,7 +148,8 @@
 		}
 	};
 
-	window.onmousemove = onMouseMove;
+	// window.onmousemove = onMouseMove;
+	window.onmousemove = onMouseMoveAbs;
 
 	function onMouseMove(e) {
 		onMouseMove.x = onMouseMove.x || e.pageX;
@@ -152,58 +163,61 @@
 		}
 	}
 
-	// 	var socket = io.connect("http://localhost:8181");
-	// 	socket.emit("init", { brightness: 100 });
+	function onMouseMoveAbs(e) {
+		onMouseMoveAbs.region = onMouseMoveAbs.region || 0;
+		var rect = e.target.getBoundingClientRect(),
+			x = e.pageX - rect.left,
+			region;
+		if ( x < 0 || x > rect.width ) { return; }
+		// you can regulate control sensitivity by resizing the browser window or setting event listener to another (smaller) element. The main thing here is its width.
+		region = Math.floor(x / (rect.width / cols));
+		if ( region !== onMouseMoveAbs.region ) {
+			onMouseMoveAbs.region = region;
+			// we can use the same method "move" here. It will check provided argument - string or number - and then will act accordingly.
+			console.log(region);
+			pitfall.move(region);
+		}
 
-	document.addEventListener("pitfall.imageData",function(event) {
-		console.log(event.detail);
-		// socket.emit("data", event.detail);
-	}, false);
+	}
 
-// Leap
-// 		var prevX = cols / 2;
 
-// 		Leap.loop(function(frame) {
-// 			var hands = frame.hands;
+	function ImageDataBroker() {
+		var self = this,
+			// socket = io.connect("http://localhost:8181"),
+			imageData,
+			dataMinerFunc, interval,
+			then, elapsed, raf;
 
-// 			if (hands.length == 0 || hands.length == 2) {
-// 				return;
-// 			}
+		self.init = function (options) {
+			dataProviderFunc = options.dataProvider;
+			interval = 1000 / options.fps;
+			// socket.emit("init", { brightness: 100 });
+		};
 
-// 			hands.forEach(function(hand, index) {
-// 			    var x = hand.palmPosition[0];
+		self.run = function () {
+		    then = window.performance.now();
+		    raf = requestAnimationFrame(getData);
+		};
 
-// 			    /*if (x < 0 && x < (xMax * -1 + reduceRangeBy)) {
-// 			    	x = xMax + reduceRangeBy;
-// 			    }
+		self.stop = function () { // just in case you need this
+			cancelAnimationFrame(raf);
+			raf = 0;
+		};
 
-// 			    if (x > 0 && x > (xMax - reduceRangeBy)) {
-// 			    	x = xMax - reduceRangeBy;
-// 			    }*/
-
-// 			    x = cols / 2 + Math.ceil(x / cols);
-
-// 			    x = (x < 1) ? 1 : (x > cols) ? cols : x;
-
-// 			    if (prevX == x) {
-// 			    	return;
-// 			    }
-
-// 			    pitfall.moveABS(x);
-// 			    prevX = x;
-
-// 			    console.log(x);
-// 			});
-
-// 		})
-// 		/*
-// 		.use('screenPosition')
-// 		.use('handEntry')
-// 		.on('handFound', function (hand) {
-// 			console.log(hand);
-// 			debugger;
-// 		});
-// */
+		function getData(now) {
+			var imageData;
+			if ( raf ) {
+			    raf = requestAnimationFrame(getData);
+			    elapsed = now - then;
+			    if ( elapsed > interval ) {
+			        then = now - (elapsed % interval);
+			  		// imageData = dataProviderFunc();
+					// console.log(imageData);
+					// socket.emit("data", imageData);
+			    }
+		    }
+		}
+	}
 	</script>
 </body>
 </html>
